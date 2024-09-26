@@ -11133,7 +11133,7 @@ func (q *FakeQuerier) GetAuthorizedWorkspacesAndAgents(ctx context.Context, prep
 			return nil, xerrors.Errorf("get provisioner job: %w", err)
 		}
 
-		agentIDs := make([]uuid.UUID, 0)
+		outAgents := make([]database.AgentIDNamePair, 0)
 		resources, err := q.getWorkspaceResourcesByJobIDNoLock(ctx, job.ID)
 		if err != nil {
 			return nil, xerrors.Errorf("get workspace resources: %w", err)
@@ -11144,7 +11144,10 @@ func (q *FakeQuerier) GetAuthorizedWorkspacesAndAgents(ctx context.Context, prep
 				return nil, xerrors.Errorf("get workspace agents: %w", err)
 			}
 			for _, a := range agents {
-				agentIDs = append(agentIDs, a.ID)
+				outAgents = append(outAgents, database.AgentIDNamePair{
+					ID:   a.ID,
+					Name: a.Name,
+				})
 			}
 		}
 
@@ -11153,7 +11156,7 @@ func (q *FakeQuerier) GetAuthorizedWorkspacesAndAgents(ctx context.Context, prep
 			WorkspaceName: w.Name,
 			JobStatus:     job.JobStatus,
 			Transition:    build.Transition,
-			AgentIds:      agentIDs,
+			Agents:        outAgents,
 		})
 	}
 

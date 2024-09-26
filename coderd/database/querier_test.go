@@ -691,17 +691,17 @@ func TestGetAuthorizedWorkspacesAndAgents(t *testing.T) {
 	for _, row := range ownerRows {
 		switch row.WorkspaceID {
 		case pendingID:
-			require.Len(t, row.AgentIds, 1)
+			require.Len(t, row.Agents, 1)
 			require.Equal(t, database.ProvisionerJobStatusPending, row.JobStatus)
 		case failedID:
-			require.Len(t, row.AgentIds, 1)
+			require.Len(t, row.Agents, 1)
 			require.Equal(t, database.ProvisionerJobStatusFailed, row.JobStatus)
 		case succeededID:
-			require.Len(t, row.AgentIds, 2)
+			require.Len(t, row.Agents, 2)
 			require.Equal(t, database.ProvisionerJobStatusSucceeded, row.JobStatus)
 			require.Equal(t, database.WorkspaceTransitionStart, row.Transition)
 		case deletedID:
-			require.Len(t, row.AgentIds, 0)
+			require.Len(t, row.Agents, 0)
 			require.Equal(t, database.ProvisionerJobStatusSucceeded, row.JobStatus)
 			require.Equal(t, database.WorkspaceTransitionDelete, row.Transition)
 		default:

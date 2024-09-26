@@ -694,7 +694,7 @@ SELECT
 	workspaces.name as workspace_name,
 	job_status,
 	transition,
-	(array_agg(agent_id) FILTER (WHERE agent_id IS NOT NULL))::uuid[] as agent_ids
+	(array_agg(ROW(agent_id, agent_name)::agent_id_name_pair) FILTER (WHERE agent_id IS NOT NULL))::agent_id_name_pair[] as agents
 FROM workspaces
 LEFT JOIN LATERAL (
 	SELECT
@@ -711,6 +711,7 @@ LEFT JOIN LATERAL (
 LEFT JOIN (
 	SELECT
 		workspace_agents.id as agent_id,
+		workspace_agents.name as agent_name,
 		job_id
 	FROM workspace_resources
 	JOIN workspace_agents ON workspace_agents.resource_id = workspace_resources.id
@@ -718,4 +719,5 @@ LEFT JOIN (
 	-- Authorize Filter clause will be injected below in GetAuthorizedWorkspacesAndAgents
 	-- @authorize_filter
 GROUP BY workspaces.id, workspaces.name, latest_build.job_status, latest_build.job_id, latest_build.transition;
+
 

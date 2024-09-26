@@ -174,3 +174,23 @@ func (*NameOrganizationPair) Scan(_ interface{}) error {
 func (a NameOrganizationPair) Value() (driver.Value, error) {
 	return fmt.Sprintf(`(%s,%s)`, a.Name, a.OrganizationID.String()), nil
 }
+
+// AgentIDNamePair is used as a result tuple for workspace and agent rows.
+type AgentIDNamePair struct {
+	ID   uuid.UUID `db:"id" json:"id"`
+	Name string    `db:"name" json:"name"`
+}
+
+func (p *AgentIDNamePair) Scan(src interface{}) error {
+	switch v := src.(type) {
+	case []byte:
+		return json.Unmarshal(v, &p)
+	case string:
+		return json.Unmarshal([]byte(v), &p)
+	}
+	return xerrors.Errorf("unexpected type %T", src)
+}
+
+func (p AgentIDNamePair) Value() (driver.Value, error) {
+	return fmt.Sprintf(`(%s,%s)`, p.ID.String(), p.Name), nil
+}

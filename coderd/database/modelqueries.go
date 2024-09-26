@@ -337,7 +337,7 @@ func (q *sqlQuerier) GetAuthorizedWorkspacesAndAgents(ctx context.Context, prepa
 			&i.WorkspaceName,
 			&i.JobStatus,
 			&i.Transition,
-			pq.Array(&i.AgentIds),
+			pq.Array(&i.Agents),
 		); err != nil {
 			return nil, err
 		}

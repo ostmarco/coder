@@ -15150,7 +15150,7 @@ SELECT
 	workspaces.name as workspace_name,
 	job_status,
 	transition,
-	(array_agg(agent_id) FILTER (WHERE agent_id IS NOT NULL))::uuid[] as agent_ids
+	(array_agg(ROW(agent_id, agent_name)::agent_id_name_pair) FILTER (WHERE agent_id IS NOT NULL))::agent_id_name_pair[] as agents
 FROM workspaces
 LEFT JOIN LATERAL (
 	SELECT
@@ -15167,6 +15167,7 @@ LEFT JOIN LATERAL (
 LEFT JOIN (
 	SELECT
 		workspace_agents.id as agent_id,
+		workspace_agents.name as agent_name,
 		job_id
 	FROM workspace_resources
 	JOIN workspace_agents ON workspace_agents.resource_id = workspace_resources.id
@@ -15181,7 +15182,7 @@ type GetWorkspacesAndAgentsRow struct {
 	WorkspaceName string               `db:"workspace_name" json:"workspace_name"`
 	JobStatus     ProvisionerJobStatus `db:"job_status" json:"job_status"`
 	Transition    WorkspaceTransition  `db:"transition" json:"transition"`
-	AgentIds      []uuid.UUID          `db:"agent_ids" json:"agent_ids"`
+	Agents        []AgentIDNamePair    `db:"agents" json:"agents"`
 }
 
 func (q *sqlQuerier) GetWorkspacesAndAgents(ctx context.Context) ([]GetWorkspacesAndAgentsRow, error) {
@@ -15198,7 +15199,7 @@ func (q *sqlQuerier) GetWorkspacesAndAgents(ctx context.Context) ([]GetWorkspace
 			&i.WorkspaceName,
 			&i.JobStatus,
 			&i.Transition,
-			pq.Array(&i.AgentIds),
+			pq.Array(&i.Agents),
 		); err != nil {
 			return nil, err
 		}
