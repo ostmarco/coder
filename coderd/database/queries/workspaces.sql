@@ -690,8 +690,9 @@ UPDATE workspaces SET favorite = false WHERE id = @id;
 
 -- name: GetWorkspacesAndAgents :many
 SELECT
-	workspaces.id as workspace_id,
-	workspaces.name as workspace_name,
+	workspaces.id as id,
+	workspaces.name as name,
+	workspaces.owner_id as owner_id,
 	job_status,
 	transition,
 	(array_agg(ROW(agent_id, agent_name)::agent_id_name_pair) FILTER (WHERE agent_id IS NOT NULL))::agent_id_name_pair[] as agents

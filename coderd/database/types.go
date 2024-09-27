@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -182,13 +183,25 @@ type AgentIDNamePair struct {
 }
 
 func (p *AgentIDNamePair) Scan(src interface{}) error {
-	switch v := src.(type) {
+	var v string
+	switch a := src.(type) {
 	case []byte:
-		return json.Unmarshal(v, &p)
+		v = string(a)
 	case string:
-		return json.Unmarshal([]byte(v), &p)
+		v = a
+	default:
+		return xerrors.Errorf("unexpected type %T", src)
 	}
-	return xerrors.Errorf("unexpected type %T", src)
+	parts := strings.Split(strings.Trim(v, "()"), ",")
+	if len(parts) != 2 {
+		return xerrors.New("invalid format for AgentIDNamePair")
+	}
+	id, err := uuid.Parse(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return err
+	}
+	p.ID, p.Name = id, strings.TrimSpace(parts[1])
+	return nil
 }
 
 func (p AgentIDNamePair) Value() (driver.Value, error) {

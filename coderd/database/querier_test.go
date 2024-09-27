@@ -689,7 +689,7 @@ func TestGetAuthorizedWorkspacesAndAgents(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ownerRows, 4)
 	for _, row := range ownerRows {
-		switch row.WorkspaceID {
+		switch row.ID {
 		case pendingID:
 			require.Len(t, row.Agents, 1)
 			require.Equal(t, database.ProvisionerJobStatusPending, row.JobStatus)
@@ -705,7 +705,7 @@ func TestGetAuthorizedWorkspacesAndAgents(t *testing.T) {
 			require.Equal(t, database.ProvisionerJobStatusSucceeded, row.JobStatus)
 			require.Equal(t, database.WorkspaceTransitionDelete, row.Transition)
 		default:
-			t.Fatalf("unexpected workspace ID: %s", row.WorkspaceID)
+			t.Fatalf("unexpected workspace ID: %s", row.ID)
 		}
 	}
 }

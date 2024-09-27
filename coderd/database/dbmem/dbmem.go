@@ -11152,11 +11152,12 @@ func (q *FakeQuerier) GetAuthorizedWorkspacesAndAgents(ctx context.Context, prep
 		}
 
 		out = append(out, database.GetWorkspacesAndAgentsRow{
-			WorkspaceID:   w.ID,
-			WorkspaceName: w.Name,
-			JobStatus:     job.JobStatus,
-			Transition:    build.Transition,
-			Agents:        outAgents,
+			ID:         w.ID,
+			Name:       w.Name,
+			OwnerID:    w.OwnerID,
+			JobStatus:  job.JobStatus,
+			Transition: build.Transition,
+			Agents:     outAgents,
 		})
 	}
 

@@ -333,8 +333,9 @@ func (q *sqlQuerier) GetAuthorizedWorkspacesAndAgents(ctx context.Context, prepa
 	for rows.Next() {
 		var i GetWorkspacesAndAgentsRow
 		if err := rows.Scan(
-			&i.WorkspaceID,
-			&i.WorkspaceName,
+			&i.ID,
+			&i.Name,
+			&i.OwnerID,
 			&i.JobStatus,
 			&i.Transition,
 			pq.Array(&i.Agents),

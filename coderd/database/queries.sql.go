@@ -15146,8 +15146,9 @@ func (q *sqlQuerier) GetWorkspaces(ctx context.Context, arg GetWorkspacesParams)
 
 const getWorkspacesAndAgents = `-- name: GetWorkspacesAndAgents :many
 SELECT
-	workspaces.id as workspace_id,
-	workspaces.name as workspace_name,
+	workspaces.id as id,
+	workspaces.name as name,
+	workspaces.owner_id as owner_id,
 	job_status,
 	transition,
 	(array_agg(ROW(agent_id, agent_name)::agent_id_name_pair) FILTER (WHERE agent_id IS NOT NULL))::agent_id_name_pair[] as agents
@@ -15178,11 +15179,12 @@ GROUP BY workspaces.id, workspaces.name, latest_build.job_status, latest_build.j
 `
 
 type GetWorkspacesAndAgentsRow struct {
-	WorkspaceID   uuid.UUID            `db:"workspace_id" json:"workspace_id"`
-	WorkspaceName string               `db:"workspace_name" json:"workspace_name"`
-	JobStatus     ProvisionerJobStatus `db:"job_status" json:"job_status"`
-	Transition    WorkspaceTransition  `db:"transition" json:"transition"`
-	Agents        []AgentIDNamePair    `db:"agents" json:"agents"`
+	ID         uuid.UUID            `db:"id" json:"id"`
+	Name       string               `db:"name" json:"name"`
+	OwnerID    uuid.UUID            `db:"owner_id" json:"owner_id"`
+	JobStatus  ProvisionerJobStatus `db:"job_status" json:"job_status"`
+	Transition WorkspaceTransition  `db:"transition" json:"transition"`
+	Agents     []AgentIDNamePair    `db:"agents" json:"agents"`
 }
 
 func (q *sqlQuerier) GetWorkspacesAndAgents(ctx context.Context) ([]GetWorkspacesAndAgentsRow, error) {
@@ -15195,8 +15197,9 @@ func (q *sqlQuerier) GetWorkspacesAndAgents(ctx context.Context) ([]GetWorkspace
 	for rows.Next() {
 		var i GetWorkspacesAndAgentsRow
 		if err := rows.Scan(
-			&i.WorkspaceID,
-			&i.WorkspaceName,
+			&i.ID,
+			&i.Name,
+			&i.OwnerID,
 			&i.JobStatus,
 			&i.Transition,
 			pq.Array(&i.Agents),
