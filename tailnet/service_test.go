@@ -74,7 +74,7 @@ func TestClientService_ServeClient_V2(t *testing.T) {
 	require.NotNil(t, call)
 	require.Equal(t, call.ID, clientID)
 	require.Equal(t, call.Name, "client")
-	require.NoError(t, call.Auth.Authorize(&proto.CoordinateRequest{
+	require.NoError(t, call.Auth.Authorize(ctx, &proto.CoordinateRequest{
 		AddTunnel: &proto.CoordinateRequest_Tunnel{Id: agentID[:]},
 	}))
 	req := testutil.RequireRecvCtx(ctx, t, call.Reqs)

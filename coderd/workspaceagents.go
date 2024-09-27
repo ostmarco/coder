@@ -856,26 +856,10 @@ func (api *API) workspaceAgentClientCoordinate(rw http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Accept a resume_token query parameter to use the same peer ID.
-	var (
-		peerID      = uuid.New()
-		resumeToken = r.URL.Query().Get("resume_token")
-	)
-	if resumeToken != "" {
-		var err error
-		peerID, err = api.Options.CoordinatorResumeTokenProvider.VerifyResumeToken(resumeToken)
-		if err != nil {
-			httpapi.Write(ctx, rw, http.StatusUnauthorized, codersdk.Response{
-				Message: workspacesdk.CoordinateAPIInvalidResumeToken,
-				Detail:  err.Error(),
-				Validations: []codersdk.ValidationError{
-					{Field: "resume_token", Detail: workspacesdk.CoordinateAPIInvalidResumeToken},
-				},
-			})
-			return
-		}
-		api.Logger.Debug(ctx, "accepted coordinate resume token for peer",
-			slog.F("peer_id", peerID.String()))
+	peerID, err := api.handleResumeToken(ctx, rw, r)
+	if err != nil {
+		// handleResumeToken has already written the response.
+		return
 	}
 
 	api.WebsocketWaitMutex.Lock()
@@ -903,6 +887,28 @@ func (api *API) workspaceAgentClientCoordinate(rw http.ResponseWriter, r *http.R
 		_ = conn.Close(websocket.StatusInternalError, err.Error())
 		return
 	}
+}
+
+// handleResumeToken accepts a resume_token query parameter to use the same peer ID
+func (api *API) handleResumeToken(ctx context.Context, rw http.ResponseWriter, r *http.Request) (peerID uuid.UUID, err error) {
+	peerID = uuid.New()
+	resumeToken := r.URL.Query().Get("resume_token")
+	if resumeToken != "" {
+		peerID, err = api.Options.CoordinatorResumeTokenProvider.VerifyResumeToken(resumeToken)
+		if err != nil {
+			httpapi.Write(ctx, rw, http.StatusUnauthorized, codersdk.Response{
+				Message: workspacesdk.CoordinateAPIInvalidResumeToken,
+				Detail:  err.Error(),
+				Validations: []codersdk.ValidationError{
+					{Field: "resume_token", Detail: workspacesdk.CoordinateAPIInvalidResumeToken},
+				},
+			})
+			return peerID, err
+		}
+		api.Logger.Debug(ctx, "accepted coordinate resume token for peer",
+			slog.F("peer_id", peerID.String()))
+	}
+	return peerID, err
 }
 
 // @Summary Post workspace agent log source
