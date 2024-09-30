@@ -17,7 +17,6 @@ import (
 
 	"cdr.dev/slog"
 	"github.com/coder/coder/v2/apiversion"
-	"github.com/coder/coder/v2/coderd/rbac"
 	"github.com/coder/coder/v2/tailnet/proto"
 	"github.com/coder/quartz"
 )
@@ -38,6 +37,12 @@ type StreamID struct {
 
 func WithStreamID(ctx context.Context, streamID StreamID) context.Context {
 	return context.WithValue(ctx, streamIDContextKey{}, streamID)
+}
+
+type WorkspaceUpdatesProvider interface {
+	Subscribe(peerID uuid.UUID, userID uuid.UUID) (<-chan *proto.WorkspaceUpdate, error)
+	Unsubscribe(peerID uuid.UUID)
+	Stop()
 }
 
 type ClientServiceOptions struct {
@@ -114,11 +119,11 @@ func (s *ClientService) ServeClient(ctx context.Context, version string, conn ne
 }
 
 type ServeUserClientOptions struct {
-	PeerID   uuid.UUID
-	UserID   uuid.UUID
-	Subject  *rbac.Subject
-	Authz    rbac.Authorizer
-	Database WorkspaceStore
+	PeerID uuid.UUID
+	UserID uuid.UUID
+	// AuthFn authorizes the user to `ActionSSH` against the workspace given
+	// an agent ID.
+	AuthFn func(context.Context, uuid.UUID) error
 }
 
 func (s *ClientService) ServeUserClient(ctx context.Context, version string, conn net.Conn, opts ServeUserClientOptions) error {
@@ -130,10 +135,8 @@ func (s *ClientService) ServeUserClient(ctx context.Context, version string, con
 	switch major {
 	case 2:
 		auth := ClientUserCoordinateeAuth{
-			UserID:      opts.UserID,
-			RBACSubject: opts.Subject,
-			Authz:       opts.Authz,
-			Database:    opts.Database,
+			UserID: opts.UserID,
+			AuthFn: opts.AuthFn,
 		}
 		streamID := StreamID{
 			Name: "client",

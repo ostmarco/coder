@@ -5223,7 +5223,7 @@ const docTemplate = `{
                     }
                 ],
                 "tags": [
-                    "Workspaces"
+                    "Agents"
                 ],
                 "summary": "Coordinate multiple workspace agents",
                 "operationId": "coordinate-multiple-workspace-agents",

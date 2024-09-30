@@ -4608,7 +4608,7 @@
 						"CoderSessionToken": []
 					}
 				],
-				"tags": ["Workspaces"],
+				"tags": ["Agents"],
 				"summary": "Coordinate multiple workspace agents",
 				"operationId": "coordinate-multiple-workspace-agents",
 				"responses": {

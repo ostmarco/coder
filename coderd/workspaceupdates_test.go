@@ -1,4 +1,4 @@
-package tailnet_test
+package coderd_test
 
 import (
 	"context"
@@ -9,11 +9,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/coder/coder/v2/coderd"
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/database/pubsub"
+	"github.com/coder/coder/v2/coderd/rbac"
 	"github.com/coder/coder/v2/codersdk"
 	"github.com/coder/coder/v2/tailnet"
 	"github.com/coder/coder/v2/tailnet/proto"
+	"github.com/coder/coder/v2/testutil"
 )
 
 func TestWorkspaceUpdates(t *testing.T) {
@@ -22,19 +25,19 @@ func TestWorkspaceUpdates(t *testing.T) {
 
 	peerID := uuid.New()
 
-	ws1id := uuid.New()
-	uuid1slice := tailnet.UUIDToByteSlice(ws1id)
-	agent1id := uuid.New()
-	agent1idslice := tailnet.UUIDToByteSlice(agent1id)
-	ws2id := uuid.New()
-	ws2idslice := tailnet.UUIDToByteSlice(ws2id)
-	ws3id := uuid.New()
-	ws3idslice := tailnet.UUIDToByteSlice(ws3id)
-	ownerid := uuid.New()
-	agent2id := uuid.New()
-	agent2idslice := tailnet.UUIDToByteSlice(agent2id)
-	ws4id := uuid.New()
-	ws4idslice := tailnet.UUIDToByteSlice(ws4id)
+	ws1ID := uuid.New()
+	ws1IDSlice := tailnet.UUIDToByteSlice(ws1ID)
+	agent1ID := uuid.New()
+	agent1IDSlice := tailnet.UUIDToByteSlice(agent1ID)
+	ws2ID := uuid.New()
+	ws2IDSlice := tailnet.UUIDToByteSlice(ws2ID)
+	ws3ID := uuid.New()
+	ws3IDSlice := tailnet.UUIDToByteSlice(ws3ID)
+	ownerID := uuid.New()
+	agent2ID := uuid.New()
+	agent2IDSlice := tailnet.UUIDToByteSlice(agent2ID)
+	ws4ID := uuid.New()
+	ws4IDSlice := tailnet.UUIDToByteSlice(ws4ID)
 
 	t.Run("Basic", func(t *testing.T) {
 		t.Parallel()
@@ -43,31 +46,31 @@ func TestWorkspaceUpdates(t *testing.T) {
 			orderedRows: []database.GetWorkspacesAndAgentsRow{
 				// Gains a new agent
 				{
-					ID:         ws1id,
+					ID:         ws1ID,
 					Name:       "ws1",
-					OwnerID:    ownerid,
+					OwnerID:    ownerID,
 					JobStatus:  database.ProvisionerJobStatusRunning,
 					Transition: database.WorkspaceTransitionStart,
 					Agents: []database.AgentIDNamePair{
 						{
-							ID:   agent1id,
+							ID:   agent1ID,
 							Name: "agent1",
 						},
 					},
 				},
 				// Changes status
 				{
-					ID:         ws2id,
+					ID:         ws2ID,
 					Name:       "ws2",
-					OwnerID:    ownerid,
+					OwnerID:    ownerID,
 					JobStatus:  database.ProvisionerJobStatusRunning,
 					Transition: database.WorkspaceTransitionStart,
 				},
 				// Is deleted
 				{
-					ID:         ws3id,
+					ID:         ws3ID,
 					Name:       "ws3",
-					OwnerID:    ownerid,
+					OwnerID:    ownerID,
 					JobStatus:  database.ProvisionerJobStatusSucceeded,
 					Transition: database.WorkspaceTransitionStop,
 				},
@@ -78,10 +81,11 @@ func TestWorkspaceUpdates(t *testing.T) {
 			cbs: map[string]pubsub.Listener{},
 		}
 
-		updateProvider, err := tailnet.NewUpdatesProvider(ctx, db, ps)
+		updateProvider, err := coderd.NewUpdatesProvider(ctx, db, ps)
+		defer updateProvider.Stop()
 		require.NoError(t, err)
 
-		ch, err := updateProvider.Subscribe(peerID, ownerid)
+		ch, err := updateProvider.Subscribe(peerID, ownerID)
 		require.NoError(t, err)
 
 		update, ok := <-ch
@@ -92,26 +96,26 @@ func TestWorkspaceUpdates(t *testing.T) {
 		require.Equal(t, &proto.WorkspaceUpdate{
 			UpsertedWorkspaces: []*proto.Workspace{
 				{
-					Id:     uuid1slice,
+					Id:     ws1IDSlice,
 					Name:   "ws1",
 					Status: proto.Workspace_STARTING,
 				},
 				{
-					Id:     ws2idslice,
+					Id:     ws2IDSlice,
 					Name:   "ws2",
 					Status: proto.Workspace_STARTING,
 				},
 				{
-					Id:     ws3idslice,
+					Id:     ws3IDSlice,
 					Name:   "ws3",
 					Status: proto.Workspace_STOPPED,
 				},
 			},
 			UpsertedAgents: []*proto.Agent{
 				{
-					Id:          agent1idslice,
+					Id:          agent1IDSlice,
 					Name:        "agent1",
-					WorkspaceId: uuid1slice,
+					WorkspaceId: ws1IDSlice,
 				},
 			},
 			DeletedWorkspaces: []*proto.Workspace{},
@@ -121,33 +125,33 @@ func TestWorkspaceUpdates(t *testing.T) {
 		// Update the database
 		db.orderedRows = []database.GetWorkspacesAndAgentsRow{
 			{
-				ID:         ws1id,
+				ID:         ws1ID,
 				Name:       "ws1",
-				OwnerID:    ownerid,
+				OwnerID:    ownerID,
 				JobStatus:  database.ProvisionerJobStatusRunning,
 				Transition: database.WorkspaceTransitionStart,
 				Agents: []database.AgentIDNamePair{
 					{
-						ID:   agent1id,
+						ID:   agent1ID,
 						Name: "agent1",
 					},
 					{
-						ID:   agent2id,
+						ID:   agent2ID,
 						Name: "agent2",
 					},
 				},
 			},
 			{
-				ID:         ws2id,
+				ID:         ws2ID,
 				Name:       "ws2",
-				OwnerID:    ownerid,
+				OwnerID:    ownerID,
 				JobStatus:  database.ProvisionerJobStatusRunning,
 				Transition: database.WorkspaceTransitionStop,
 			},
 			{
-				ID:         ws4id,
+				ID:         ws4ID,
 				Name:       "ws4",
-				OwnerID:    ownerid,
+				OwnerID:    ownerID,
 				JobStatus:  database.ProvisionerJobStatusRunning,
 				Transition: database.WorkspaceTransitionStart,
 			},
@@ -163,27 +167,27 @@ func TestWorkspaceUpdates(t *testing.T) {
 			UpsertedWorkspaces: []*proto.Workspace{
 				{
 					// Changed status
-					Id:     ws2idslice,
+					Id:     ws2IDSlice,
 					Name:   "ws2",
 					Status: proto.Workspace_STOPPING,
 				},
 				{
 					// New workspace
-					Id:     ws4idslice,
+					Id:     ws4IDSlice,
 					Name:   "ws4",
 					Status: proto.Workspace_STARTING,
 				},
 			},
 			UpsertedAgents: []*proto.Agent{
 				{
-					Id:          agent2idslice,
+					Id:          agent2IDSlice,
 					Name:        "agent2",
-					WorkspaceId: uuid1slice,
+					WorkspaceId: ws1IDSlice,
 				},
 			},
 			DeletedWorkspaces: []*proto.Workspace{
 				{
-					Id:     ws3idslice,
+					Id:     ws3IDSlice,
 					Name:   "ws3",
 					Status: proto.Workspace_STOPPED,
 				},
@@ -198,14 +202,14 @@ func TestWorkspaceUpdates(t *testing.T) {
 		db := &mockWorkspaceStore{
 			orderedRows: []database.GetWorkspacesAndAgentsRow{
 				{
-					ID:         ws1id,
+					ID:         ws1ID,
 					Name:       "ws1",
-					OwnerID:    ownerid,
+					OwnerID:    ownerID,
 					JobStatus:  database.ProvisionerJobStatusRunning,
 					Transition: database.WorkspaceTransitionStart,
 					Agents: []database.AgentIDNamePair{
 						{
-							ID:   agent1id,
+							ID:   agent1ID,
 							Name: "agent1",
 						},
 					},
@@ -217,39 +221,48 @@ func TestWorkspaceUpdates(t *testing.T) {
 			cbs: map[string]pubsub.Listener{},
 		}
 
-		updateProvider, err := tailnet.NewUpdatesProvider(ctx, db, ps)
+		updateProvider, err := coderd.NewUpdatesProvider(ctx, db, ps)
+		defer updateProvider.Stop()
 		require.NoError(t, err)
 
-		ch, err := updateProvider.Subscribe(peerID, ownerid)
+		ch, err := updateProvider.Subscribe(peerID, ownerID)
 		require.NoError(t, err)
 
-		update, ok := <-ch
-		require.True(t, ok)
-		slices.SortFunc(update.UpsertedWorkspaces, func(a, b *proto.Workspace) int {
-			return strings.Compare(a.Name, b.Name)
-		})
-		require.Equal(t, &proto.WorkspaceUpdate{
+		expected := &proto.WorkspaceUpdate{
 			UpsertedWorkspaces: []*proto.Workspace{
 				{
-					Id:     uuid1slice,
+					Id:     ws1IDSlice,
 					Name:   "ws1",
 					Status: proto.Workspace_STARTING,
 				},
 			},
 			UpsertedAgents: []*proto.Agent{
 				{
-					Id:          agent1idslice,
+					Id:          agent1IDSlice,
 					Name:        "agent1",
-					WorkspaceId: uuid1slice,
+					WorkspaceId: ws1IDSlice,
 				},
 			},
 			DeletedWorkspaces: []*proto.Workspace{},
 			DeletedAgents:     []*proto.Agent{},
-		}, update)
+		}
 
-		// Unsubscribe
-		// err = updateProvider.Unsubscribe(ownerid)
-		// require.NoError(t, err)
+		update := testutil.RequireRecvCtx(ctx, t, ch)
+		slices.SortFunc(update.UpsertedWorkspaces, func(a, b *proto.Workspace) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+		require.Equal(t, expected, update)
+
+		updateProvider.Unsubscribe(ownerID)
+		require.NoError(t, err)
+		ch, err = updateProvider.Subscribe(peerID, ownerID)
+		require.NoError(t, err)
+
+		update = testutil.RequireRecvCtx(ctx, t, ch)
+		slices.SortFunc(update.UpsertedWorkspaces, func(a, b *proto.Workspace) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+		require.Equal(t, expected, update)
 	})
 }
 
@@ -257,14 +270,17 @@ type mockWorkspaceStore struct {
 	orderedRows []database.GetWorkspacesAndAgentsRow
 }
 
-var _ tailnet.WorkspaceStore = (*mockWorkspaceStore)(nil)
+// GetWorkspaceRBACByAgentID implements tailnet.UpdateQuerier.
+func (*mockWorkspaceStore) GetWorkspaceRBACByAgentID(context.Context, uuid.UUID) (rbac.Objecter, error) {
+	panic("unimplemented")
+}
 
-func (*mockWorkspaceStore) GetWorkspaceByAgentID(context.Context, uuid.UUID) (database.GetWorkspaceByAgentIDRow, error) {
-	return database.GetWorkspaceByAgentIDRow{}, nil
+// GetWorkspacesAndAgents implements tailnet.UpdateQuerier.
+func (m *mockWorkspaceStore) GetWorkspacesAndAgents(context.Context) ([]database.GetWorkspacesAndAgentsRow, error) {
+	return m.orderedRows, nil
 }
-func (db *mockWorkspaceStore) GetWorkspacesAndAgents(context.Context) ([]database.GetWorkspacesAndAgentsRow, error) {
-	return db.orderedRows, nil
-}
+
+var _ coderd.UpdateQuerier = (*mockWorkspaceStore)(nil)
 
 type mockPubsub struct {
 	cbs map[string]pubsub.Listener

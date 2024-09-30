@@ -32,6 +32,7 @@ import (
 	"github.com/coder/coder/v2/coderd/externalauth"
 	"github.com/coder/coder/v2/coderd/httpapi"
 	"github.com/coder/coder/v2/coderd/httpmw"
+	"github.com/coder/coder/v2/coderd/rbac"
 	"github.com/coder/coder/v2/coderd/rbac/policy"
 	"github.com/coder/coder/v2/coderd/wspubsub"
 	"github.com/coder/coder/v2/codersdk"
@@ -1479,6 +1480,89 @@ func (api *API) workspaceAgentsExternalAuthListen(ctx context.Context, rw http.R
 		}
 		httpapi.Write(ctx, rw, http.StatusOK, resp)
 		return
+	}
+}
+
+// @Summary Coordinate multiple workspace agents
+// @ID coordinate-multiple-workspace-agents
+// @Security CoderSessionToken
+// @Tags Agents
+// @Success 101
+// @Router /users/me/tailnet [get]
+func (api *API) tailnet(rw http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	owner := httpmw.UserParam(r)
+	ownerRoles := httpmw.UserAuthorization(r)
+
+	// Check if the actor is allowed to access any workspace owned by the user.
+	if !api.Authorize(r, policy.ActionSSH, rbac.ResourceWorkspace.WithOwner(owner.ID.String())) {
+		httpapi.ResourceNotFound(rw)
+		return
+	}
+
+	version := "1.0"
+	qv := r.URL.Query().Get("version")
+	if qv != "" {
+		version = qv
+	}
+	if err := proto.CurrentVersion.Validate(version); err != nil {
+		httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
+			Message: "Unknown or unsupported API version",
+			Validations: []codersdk.ValidationError{
+				{Field: "version", Detail: err.Error()},
+			},
+		})
+		return
+	}
+
+	peerID, err := api.handleResumeToken(ctx, rw, r)
+	if err != nil {
+		// handleResumeToken has already written the response.
+		return
+	}
+
+	api.WebsocketWaitMutex.Lock()
+	api.WebsocketWaitGroup.Add(1)
+	api.WebsocketWaitMutex.Unlock()
+	defer api.WebsocketWaitGroup.Done()
+
+	conn, err := websocket.Accept(rw, r, nil)
+	if err != nil {
+		httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
+			Message: "Failed to accept websocket.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+	ctx, wsNetConn := codersdk.WebsocketNetConn(ctx, conn, websocket.MessageBinary)
+	defer wsNetConn.Close()
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	go httpapi.Heartbeat(ctx, conn)
+	err = api.TailnetClientService.ServeUserClient(ctx, version, wsNetConn, tailnet.ServeUserClientOptions{
+		PeerID: peerID,
+		UserID: owner.ID,
+		AuthFn: authAgentFn(api.Database, api.Authorizer, &ownerRoles),
+	})
+	if err != nil && !xerrors.Is(err, io.EOF) && !xerrors.Is(err, context.Canceled) {
+		_ = conn.Close(websocket.StatusInternalError, err.Error())
+		return
+	}
+}
+
+// authAgentFn accepts a subject, and returns a closure that authorizes against
+// passed agent IDs.
+func authAgentFn(db database.Store, auth rbac.Authorizer, user *rbac.Subject) func(context.Context, uuid.UUID) error {
+	return func(ctx context.Context, agentID uuid.UUID) error {
+		ws, err := db.GetWorkspaceByAgentID(ctx, agentID)
+		if err != nil {
+			return xerrors.Errorf("get workspace by agent id: %w", err)
+		}
+		err = auth.Authorize(ctx, *user, policy.ActionSSH, ws.RBACObject())
+		if err != nil {
+			return xerrors.Errorf("workspace agent not found or you do not have permission: %w", sql.ErrNoRows)
+		}
+		return nil
 	}
 }
 

@@ -8,8 +8,6 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/xerrors"
 
-	"github.com/coder/coder/v2/coderd/rbac"
-	"github.com/coder/coder/v2/coderd/rbac/policy"
 	"github.com/coder/coder/v2/tailnet/proto"
 )
 
@@ -95,10 +93,8 @@ func (a AgentCoordinateeAuth) Authorize(_ context.Context, req *proto.Coordinate
 }
 
 type ClientUserCoordinateeAuth struct {
-	UserID      uuid.UUID
-	RBACSubject *rbac.Subject
-	Authz       rbac.Authorizer
-	Database    WorkspaceStore
+	UserID uuid.UUID
+	AuthFn func(context.Context, uuid.UUID) error
 }
 
 func (a ClientUserCoordinateeAuth) Authorize(ctx context.Context, req *proto.CoordinateRequest) error {
@@ -107,11 +103,7 @@ func (a ClientUserCoordinateeAuth) Authorize(ctx context.Context, req *proto.Coo
 		if err != nil {
 			return xerrors.Errorf("parse add tunnel id: %w", err)
 		}
-		row, err := a.Database.GetWorkspaceByAgentID(ctx, uid)
-		if err != nil {
-			return xerrors.Errorf("get workspace by agent id: %w", err)
-		}
-		err = a.Authz.Authorize(ctx, *a.RBACSubject, policy.ActionSSH, row.Workspace.RBACObject())
+		err = a.AuthFn(ctx, uid)
 		if err != nil {
 			return xerrors.Errorf("workspace agent not found or you do not have permission: %w", sql.ErrNoRows)
 		}

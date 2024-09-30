@@ -1,4 +1,4 @@
-package tailnet
+package coderd
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/coder/coder/v2/coderd/database/pubsub"
 	"github.com/coder/coder/v2/coderd/util/slice"
 	"github.com/coder/coder/v2/codersdk"
+	"github.com/coder/coder/v2/tailnet"
 	"github.com/coder/coder/v2/tailnet/proto"
 )
 
@@ -54,7 +55,7 @@ func convertRows(v []database.GetWorkspacesAndAgentsRow) workspacesByOwner {
 
 func convertStatus(status database.ProvisionerJobStatus, trans database.WorkspaceTransition) proto.Workspace_Status {
 	wsStatus := codersdk.ConvertWorkspaceStatus(codersdk.ProvisionerJobStatus(status), codersdk.WorkspaceTransition(trans))
-	return WorkspaceStatusToProto(wsStatus)
+	return tailnet.WorkspaceStatusToProto(wsStatus)
 }
 
 type sub struct {
@@ -75,30 +76,24 @@ func (s *sub) send(all workspacesByOwner) {
 	s.tx <- update
 }
 
-type WorkspaceUpdatesProvider interface {
-	Subscribe(peerID uuid.UUID, userID uuid.UUID) (<-chan *proto.WorkspaceUpdate, error)
-	Unsubscribe(peerID uuid.UUID)
-	Stop()
-}
-
-type WorkspaceStore interface {
-	GetWorkspaceByAgentID(ctx context.Context, agentID uuid.UUID) (database.GetWorkspaceByAgentIDRow, error)
+type UpdateQuerier interface {
 	GetWorkspacesAndAgents(ctx context.Context) ([]database.GetWorkspacesAndAgentsRow, error)
 }
 
 type updatesProvider struct {
 	mu sync.RWMutex
-	db WorkspaceStore
+	db UpdateQuerier
 	ps pubsub.Pubsub
 	// Peer ID -> subscription
-	subs     map[uuid.UUID]*sub
+	subs map[uuid.UUID]*sub
+	// Owner ID -> workspace ID -> workspace
 	latest   workspacesByOwner
 	cancelFn func()
 }
 
-var _ WorkspaceUpdatesProvider = (*updatesProvider)(nil)
+var _ tailnet.WorkspaceUpdatesProvider = (*updatesProvider)(nil)
 
-func NewUpdatesProvider(ctx context.Context, db WorkspaceStore, ps pubsub.Pubsub) (WorkspaceUpdatesProvider, error) {
+func NewUpdatesProvider(ctx context.Context, db UpdateQuerier, ps pubsub.Pubsub) (tailnet.WorkspaceUpdatesProvider, error) {
 	rows, err := db.GetWorkspacesAndAgents(ctx)
 	if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
 		return nil, err
@@ -176,7 +171,6 @@ func (u *updatesProvider) Unsubscribe(peerID uuid.UUID) {
 	}
 	close(sub.tx)
 	delete(u.subs, peerID)
-	return
 }
 
 func produceUpdate(old, new workspacesByID) *proto.WorkspaceUpdate {
@@ -192,15 +186,15 @@ func produceUpdate(old, new workspacesByID) *proto.WorkspaceUpdate {
 		// Upsert both workspace and agents if the workspace is new
 		if !exists {
 			out.UpsertedWorkspaces = append(out.UpsertedWorkspaces, &proto.Workspace{
-				Id:     UUIDToByteSlice(wsID),
+				Id:     tailnet.UUIDToByteSlice(wsID),
 				Name:   newWorkspace.WorkspaceName,
 				Status: convertStatus(newWorkspace.JobStatus, newWorkspace.Transition),
 			})
 			for _, agent := range newWorkspace.Agents {
 				out.UpsertedAgents = append(out.UpsertedAgents, &proto.Agent{
-					Id:          UUIDToByteSlice(agent.ID),
+					Id:          tailnet.UUIDToByteSlice(agent.ID),
 					Name:        agent.Name,
-					WorkspaceId: UUIDToByteSlice(wsID),
+					WorkspaceId: tailnet.UUIDToByteSlice(wsID),
 				})
 			}
 			continue
@@ -208,7 +202,7 @@ func produceUpdate(old, new workspacesByID) *proto.WorkspaceUpdate {
 		// Upsert workspace if the workspace is updated
 		if !newWorkspace.Equal(oldWorkspace) {
 			out.UpsertedWorkspaces = append(out.UpsertedWorkspaces, &proto.Workspace{
-				Id:     UUIDToByteSlice(wsID),
+				Id:     tailnet.UUIDToByteSlice(wsID),
 				Name:   newWorkspace.WorkspaceName,
 				Status: convertStatus(newWorkspace.JobStatus, newWorkspace.Transition),
 			})
@@ -217,16 +211,16 @@ func produceUpdate(old, new workspacesByID) *proto.WorkspaceUpdate {
 		add, remove := slice.SymmetricDifference(oldWorkspace.Agents, newWorkspace.Agents)
 		for _, agent := range add {
 			out.UpsertedAgents = append(out.UpsertedAgents, &proto.Agent{
-				Id:          UUIDToByteSlice(agent.ID),
+				Id:          tailnet.UUIDToByteSlice(agent.ID),
 				Name:        agent.Name,
-				WorkspaceId: UUIDToByteSlice(wsID),
+				WorkspaceId: tailnet.UUIDToByteSlice(wsID),
 			})
 		}
 		for _, agent := range remove {
 			out.DeletedAgents = append(out.DeletedAgents, &proto.Agent{
-				Id:          UUIDToByteSlice(agent.ID),
+				Id:          tailnet.UUIDToByteSlice(agent.ID),
 				Name:        agent.Name,
-				WorkspaceId: UUIDToByteSlice(wsID),
+				WorkspaceId: tailnet.UUIDToByteSlice(wsID),
 			})
 		}
 	}
@@ -235,15 +229,15 @@ func produceUpdate(old, new workspacesByID) *proto.WorkspaceUpdate {
 	for wsID, oldWorkspace := range old {
 		if _, exists := new[wsID]; !exists {
 			out.DeletedWorkspaces = append(out.DeletedWorkspaces, &proto.Workspace{
-				Id:     UUIDToByteSlice(wsID),
+				Id:     tailnet.UUIDToByteSlice(wsID),
 				Name:   oldWorkspace.WorkspaceName,
 				Status: convertStatus(oldWorkspace.JobStatus, oldWorkspace.Transition),
 			})
 			for _, agent := range oldWorkspace.Agents {
 				out.DeletedAgents = append(out.DeletedAgents, &proto.Agent{
-					Id:          UUIDToByteSlice(agent.ID),
+					Id:          tailnet.UUIDToByteSlice(agent.ID),
 					Name:        agent.Name,
-					WorkspaceId: UUIDToByteSlice(wsID),
+					WorkspaceId: tailnet.UUIDToByteSlice(wsID),
 				})
 			}
 		}
