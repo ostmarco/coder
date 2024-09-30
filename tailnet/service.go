@@ -259,10 +259,12 @@ func (s *DRPCService) WorkspaceUpdates(_ *proto.WorkspaceUpdatesRequest, stream 
 	)
 	switch auth := streamID.Auth.(type) {
 	case ClientUserCoordinateeAuth:
-		updatesCh, err = s.WorkspaceUpdatesProvider.Subscribe(auth.UserID)
+		// Stream ID is the peer ID
+		updatesCh, err = s.WorkspaceUpdatesProvider.Subscribe(streamID.ID, auth.UserID)
 		if err != nil {
 			err = xerrors.Errorf("subscribe to workspace updates: %w", err)
 		}
+		defer s.WorkspaceUpdatesProvider.Unsubscribe(streamID.ID)
 	default:
 		err = xerrors.Errorf("workspace updates not supported by auth name %T", auth)
 	}
@@ -273,6 +275,9 @@ func (s *DRPCService) WorkspaceUpdates(_ *proto.WorkspaceUpdatesRequest, stream 
 	for {
 		select {
 		case updates := <-updatesCh:
+			if updates == nil {
+				return nil
+			}
 			err := stream.Send(updates)
 			if err != nil {
 				return xerrors.Errorf("send workspace update: %w", err)

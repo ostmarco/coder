@@ -40,6 +40,7 @@ func convertRows(v []database.GetWorkspacesAndAgentsRow) workspacesByOwner {
 			WorkspaceName: ws.Name,
 			JobStatus:     ws.JobStatus,
 			Transition:    ws.Transition,
+			Agents:        ws.Agents,
 		}
 		if byID, exists := m[ws.OwnerID]; !exists {
 			m[ws.OwnerID] = map[uuid.UUID]ownedWorkspace{ws.ID: owned}
@@ -68,14 +69,16 @@ func (s *sub) send(all workspacesByOwner) {
 	defer s.mu.Unlock()
 
 	// Filter to only the workspaces owned by the user
-	own := all[s.userID]
-	update := produceUpdate(s.prev, own)
-	s.prev = own
+	latest := all[s.userID]
+	update := produceUpdate(s.prev, latest)
+	s.prev = latest
 	s.tx <- update
 }
 
 type WorkspaceUpdatesProvider interface {
-	Subscribe(userID uuid.UUID) (<-chan *proto.WorkspaceUpdate, error)
+	Subscribe(peerID uuid.UUID, userID uuid.UUID) (<-chan *proto.WorkspaceUpdate, error)
+	Unsubscribe(peerID uuid.UUID)
+	Stop()
 }
 
 type WorkspaceStore interface {
@@ -84,25 +87,40 @@ type WorkspaceStore interface {
 }
 
 type updatesProvider struct {
-	mu       sync.RWMutex
-	db       WorkspaceStore
-	ps       pubsub.Pubsub
-	subs     []*sub
+	mu sync.RWMutex
+	db WorkspaceStore
+	ps pubsub.Pubsub
+	// Peer ID -> subscription
+	subs     map[uuid.UUID]*sub
+	latest   workspacesByOwner
 	cancelFn func()
 }
 
 var _ WorkspaceUpdatesProvider = (*updatesProvider)(nil)
 
-func (u *updatesProvider) Start() error {
-	cancel, err := u.ps.Subscribe(codersdk.AllWorkspacesNotifyChannel, u.handleUpdate)
-	if err != nil {
-		return err
+func NewUpdatesProvider(ctx context.Context, db WorkspaceStore, ps pubsub.Pubsub) (WorkspaceUpdatesProvider, error) {
+	rows, err := db.GetWorkspacesAndAgents(ctx)
+	if err != nil && !xerrors.Is(err, sql.ErrNoRows) {
+		return nil, err
 	}
-	u.cancelFn = cancel
-	return nil
+	out := &updatesProvider{
+		db:     db,
+		ps:     ps,
+		subs:   map[uuid.UUID]*sub{},
+		latest: convertRows(rows),
+	}
+	cancel, err := ps.Subscribe(codersdk.AllWorkspacesNotifyChannel, out.handleUpdate)
+	if err != nil {
+		return nil, err
+	}
+	out.cancelFn = cancel
+	return out, nil
 }
 
 func (u *updatesProvider) Stop() {
+	for _, sub := range u.subs {
+		close(sub.tx)
+	}
 	u.cancelFn()
 }
 
@@ -116,7 +134,6 @@ func (u *updatesProvider) handleUpdate(ctx context.Context, _ []byte) {
 	wg := &sync.WaitGroup{}
 	latest := convertRows(rows)
 	u.mu.RLock()
-	defer u.mu.RUnlock()
 	for _, sub := range u.subs {
 		sub := sub
 		wg.Add(1)
@@ -125,18 +142,15 @@ func (u *updatesProvider) handleUpdate(ctx context.Context, _ []byte) {
 			defer wg.Done()
 		}()
 	}
+	u.mu.RUnlock()
+
+	u.mu.Lock()
+	u.latest = latest
+	u.mu.Unlock()
 	wg.Wait()
 }
 
-func NewUpdatesProvider(db WorkspaceStore, ps pubsub.Pubsub) WorkspaceUpdatesProvider {
-	return &updatesProvider{
-		db:   db,
-		ps:   ps,
-		subs: make([]*sub, 0),
-	}
-}
-
-func (u *updatesProvider) Subscribe(userID uuid.UUID) (<-chan *proto.WorkspaceUpdate, error) {
+func (u *updatesProvider) Subscribe(peerID uuid.UUID, userID uuid.UUID) (<-chan *proto.WorkspaceUpdate, error) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
@@ -146,8 +160,23 @@ func (u *updatesProvider) Subscribe(userID uuid.UUID) (<-chan *proto.WorkspaceUp
 		tx:     tx,
 		prev:   make(workspacesByID),
 	}
-	u.subs = append(u.subs, sub)
+	u.subs[peerID] = sub
+	// Write initial state
+	sub.send(u.latest)
 	return tx, nil
+}
+
+func (u *updatesProvider) Unsubscribe(peerID uuid.UUID) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	sub, exists := u.subs[peerID]
+	if !exists {
+		return
+	}
+	close(sub.tx)
+	delete(u.subs, peerID)
+	return
 }
 
 func produceUpdate(old, new workspacesByID) *proto.WorkspaceUpdate {
