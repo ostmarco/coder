@@ -577,7 +577,7 @@ func (c *core) handleRequest(p *peer, req *proto.CoordinateRequest) error {
 		return ErrAlreadyRemoved
 	}
 
-	if err := pr.auth.Authorize(context.Background(), req); err != nil {
+	if err := pr.auth.Authorize(req); err != nil {
 		return xerrors.Errorf("authorize request: %w", err)
 	}
 

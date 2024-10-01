@@ -43,6 +43,7 @@ type WorkspaceUpdatesProvider interface {
 	Subscribe(peerID uuid.UUID, userID uuid.UUID) (<-chan *proto.WorkspaceUpdate, error)
 	Unsubscribe(peerID uuid.UUID)
 	Stop()
+	IsOwner(userID uuid.UUID, agentID uuid.UUID) error
 }
 
 type ClientServiceOptions struct {
@@ -119,11 +120,9 @@ func (s *ClientService) ServeClient(ctx context.Context, version string, conn ne
 }
 
 type ServeUserClientOptions struct {
-	PeerID uuid.UUID
-	UserID uuid.UUID
-	// AuthFn authorizes the user to `ActionSSH` against the workspace given
-	// an agent ID.
-	AuthFn func(context.Context, uuid.UUID) error
+	PeerID          uuid.UUID
+	UserID          uuid.UUID
+	UpdatesProvider WorkspaceUpdatesProvider
 }
 
 func (s *ClientService) ServeUserClient(ctx context.Context, version string, conn net.Conn, opts ServeUserClientOptions) error {
@@ -136,7 +135,6 @@ func (s *ClientService) ServeUserClient(ctx context.Context, version string, con
 	case 2:
 		auth := ClientUserCoordinateeAuth{
 			UserID: opts.UserID,
-			AuthFn: opts.AuthFn,
 		}
 		streamID := StreamID{
 			Name: "client",

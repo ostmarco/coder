@@ -1,7 +1,6 @@
 package tailnet
 
 import (
-	"context"
 	"database/sql"
 	"net/netip"
 
@@ -14,13 +13,13 @@ import (
 var legacyWorkspaceAgentIP = netip.MustParseAddr("fd7a:115c:a1e0:49d6:b259:b7ac:b1b2:48f4")
 
 type CoordinateeAuth interface {
-	Authorize(ctx context.Context, req *proto.CoordinateRequest) error
+	Authorize(req *proto.CoordinateRequest) error
 }
 
 // SingleTailnetCoordinateeAuth allows all tunnels, since Coderd and wsproxy are allowed to initiate a tunnel to any agent
 type SingleTailnetCoordinateeAuth struct{}
 
-func (SingleTailnetCoordinateeAuth) Authorize(context.Context, *proto.CoordinateRequest) error {
+func (SingleTailnetCoordinateeAuth) Authorize(*proto.CoordinateRequest) error {
 	return nil
 }
 
@@ -29,7 +28,7 @@ type ClientCoordinateeAuth struct {
 	AgentID uuid.UUID
 }
 
-func (c ClientCoordinateeAuth) Authorize(_ context.Context, req *proto.CoordinateRequest) error {
+func (c ClientCoordinateeAuth) Authorize(req *proto.CoordinateRequest) error {
 	if tun := req.GetAddTunnel(); tun != nil {
 		uid, err := uuid.FromBytes(tun.Id)
 		if err != nil {
@@ -66,7 +65,7 @@ type AgentCoordinateeAuth struct {
 	ID uuid.UUID
 }
 
-func (a AgentCoordinateeAuth) Authorize(_ context.Context, req *proto.CoordinateRequest) error {
+func (a AgentCoordinateeAuth) Authorize(req *proto.CoordinateRequest) error {
 	if tun := req.GetAddTunnel(); tun != nil {
 		return xerrors.New("agents cannot open tunnels")
 	}
@@ -93,17 +92,17 @@ func (a AgentCoordinateeAuth) Authorize(_ context.Context, req *proto.Coordinate
 }
 
 type ClientUserCoordinateeAuth struct {
-	UserID uuid.UUID
-	AuthFn func(context.Context, uuid.UUID) error
+	UserID          uuid.UUID
+	UpdatesProvider WorkspaceUpdatesProvider
 }
 
-func (a ClientUserCoordinateeAuth) Authorize(ctx context.Context, req *proto.CoordinateRequest) error {
+func (a ClientUserCoordinateeAuth) Authorize(req *proto.CoordinateRequest) error {
 	if tun := req.GetAddTunnel(); tun != nil {
 		uid, err := uuid.FromBytes(tun.Id)
 		if err != nil {
 			return xerrors.Errorf("parse add tunnel id: %w", err)
 		}
-		err = a.AuthFn(ctx, uid)
+		err = a.UpdatesProvider.IsOwner(a.UserID, uid)
 		if err != nil {
 			return xerrors.Errorf("workspace agent not found or you do not have permission: %w", sql.ErrNoRows)
 		}

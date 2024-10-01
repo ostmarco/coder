@@ -91,6 +91,24 @@ type updatesProvider struct {
 	cancelFn func()
 }
 
+func (u *updatesProvider) IsOwner(userID uuid.UUID, agentID uuid.UUID) error {
+	u.mu.RLock()
+	defer u.mu.RUnlock()
+
+	workspaces, exists := u.latest[userID]
+	if !exists {
+		return xerrors.Errorf("workspace agent not found or you do not have permission: %w", sql.ErrNoRows)
+	}
+	for _, workspace := range workspaces {
+		for _, agent := range workspace.Agents {
+			if agent.ID == agentID {
+				return nil
+			}
+		}
+	}
+	return xerrors.Errorf("workspace agent not found or you do not have permission: %w", sql.ErrNoRows)
+}
+
 var _ tailnet.WorkspaceUpdatesProvider = (*updatesProvider)(nil)
 
 func NewUpdatesProvider(ctx context.Context, db UpdateQuerier, ps pubsub.Pubsub) (tailnet.WorkspaceUpdatesProvider, error) {
