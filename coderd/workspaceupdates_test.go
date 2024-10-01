@@ -2,6 +2,7 @@ package coderd_test
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -12,8 +13,8 @@ import (
 	"github.com/coder/coder/v2/coderd"
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/coderd/database/pubsub"
-	"github.com/coder/coder/v2/coderd/rbac"
-	"github.com/coder/coder/v2/codersdk"
+	"github.com/coder/coder/v2/coderd/util/ptr"
+	"github.com/coder/coder/v2/coderd/wspubsub"
 	"github.com/coder/coder/v2/tailnet"
 	"github.com/coder/coder/v2/tailnet/proto"
 	"github.com/coder/coder/v2/testutil"
@@ -43,12 +44,11 @@ func TestWorkspaceUpdates(t *testing.T) {
 		t.Parallel()
 
 		db := &mockWorkspaceStore{
-			orderedRows: []database.GetWorkspacesAndAgentsRow{
+			orderedRows: []database.GetWorkspacesAndAgentsByOwnerIDRow{
 				// Gains a new agent
 				{
 					ID:         ws1ID,
 					Name:       "ws1",
-					OwnerID:    ownerID,
 					JobStatus:  database.ProvisionerJobStatusRunning,
 					Transition: database.WorkspaceTransitionStart,
 					Agents: []database.AgentIDNamePair{
@@ -62,7 +62,6 @@ func TestWorkspaceUpdates(t *testing.T) {
 				{
 					ID:         ws2ID,
 					Name:       "ws2",
-					OwnerID:    ownerID,
 					JobStatus:  database.ProvisionerJobStatusRunning,
 					Transition: database.WorkspaceTransitionStart,
 				},
@@ -70,7 +69,6 @@ func TestWorkspaceUpdates(t *testing.T) {
 				{
 					ID:         ws3ID,
 					Name:       "ws3",
-					OwnerID:    ownerID,
 					JobStatus:  database.ProvisionerJobStatusSucceeded,
 					Transition: database.WorkspaceTransitionStop,
 				},
@@ -88,8 +86,7 @@ func TestWorkspaceUpdates(t *testing.T) {
 		ch, err := updateProvider.Subscribe(peerID, ownerID)
 		require.NoError(t, err)
 
-		update, ok := <-ch
-		require.True(t, ok)
+		update := testutil.RequireRecvCtx(ctx, t, ch)
 		slices.SortFunc(update.UpsertedWorkspaces, func(a, b *proto.Workspace) int {
 			return strings.Compare(a.Name, b.Name)
 		})
@@ -122,62 +119,15 @@ func TestWorkspaceUpdates(t *testing.T) {
 			DeletedAgents:     []*proto.Agent{},
 		}, update)
 
-		// Update the database
-		db.orderedRows = []database.GetWorkspacesAndAgentsRow{
-			{
-				ID:         ws1ID,
-				Name:       "ws1",
-				OwnerID:    ownerID,
-				JobStatus:  database.ProvisionerJobStatusRunning,
-				Transition: database.WorkspaceTransitionStart,
-				Agents: []database.AgentIDNamePair{
-					{
-						ID:   agent1ID,
-						Name: "agent1",
-					},
-					{
-						ID:   agent2ID,
-						Name: "agent2",
-					},
-				},
-			},
-			{
-				ID:         ws2ID,
-				Name:       "ws2",
-				OwnerID:    ownerID,
-				JobStatus:  database.ProvisionerJobStatusRunning,
-				Transition: database.WorkspaceTransitionStop,
-			},
-			{
-				ID:         ws4ID,
-				Name:       "ws4",
-				OwnerID:    ownerID,
-				JobStatus:  database.ProvisionerJobStatusRunning,
-				Transition: database.WorkspaceTransitionStart,
-			},
-		}
-		ps.Publish(codersdk.AllWorkspacesNotifyChannel, nil)
-
-		update, ok = <-ch
-		require.True(t, ok)
-		slices.SortFunc(update.UpsertedWorkspaces, func(a, b *proto.Workspace) int {
-			return strings.Compare(a.Name, b.Name)
+		// Add an agent to ws1
+		publishWorkspaceEvent(t, ps, ownerID, &wspubsub.WorkspaceEvent{
+			Kind:        wspubsub.WorkspaceEventKindAgentUpdate,
+			WorkspaceID: ws1ID,
+			AgentID:     &agent2ID,
+			AgentName:   ptr.Ref("agent2"),
 		})
+		update = testutil.RequireRecvCtx(ctx, t, ch)
 		require.Equal(t, &proto.WorkspaceUpdate{
-			UpsertedWorkspaces: []*proto.Workspace{
-				{
-					// Changed status
-					Id:     ws2IDSlice,
-					Name:   "ws2",
-					Status: proto.Workspace_STOPPING,
-				},
-				{
-					// New workspace
-					Id:     ws4IDSlice,
-					Name:   "ws4",
-					Status: proto.Workspace_STARTING,
-				},
-			},
 			UpsertedAgents: []*proto.Agent{
 				{
 					Id:          agent2IDSlice,
@@ -185,14 +135,75 @@ func TestWorkspaceUpdates(t *testing.T) {
 					WorkspaceId: ws1IDSlice,
 				},
 			},
+			UpsertedWorkspaces: []*proto.Workspace{},
+			DeletedWorkspaces:  []*proto.Workspace{},
+			DeletedAgents:      []*proto.Agent{},
+		}, update)
+
+		// Change ws2 status
+		publishWorkspaceEvent(t, ps, ownerID, &wspubsub.WorkspaceEvent{
+			Kind:          wspubsub.WorkspaceEventKindStateChange,
+			WorkspaceID:   ws2ID,
+			WorkspaceName: ptr.Ref("ws2"),
+			Transition:    ptr.Ref(database.WorkspaceTransitionStop),
+			JobStatus:     ptr.Ref(database.ProvisionerJobStatusRunning),
+		})
+		update = testutil.RequireRecvCtx(ctx, t, ch)
+		require.Equal(t, &proto.WorkspaceUpdate{
+			UpsertedWorkspaces: []*proto.Workspace{
+				{
+					Id:     ws2IDSlice,
+					Name:   "ws2",
+					Status: proto.Workspace_STOPPING,
+				},
+			},
+			UpsertedAgents:    []*proto.Agent{},
+			DeletedWorkspaces: []*proto.Workspace{},
+			DeletedAgents:     []*proto.Agent{},
+		}, update)
+
+		// Delete ws3
+		publishWorkspaceEvent(t, ps, ownerID, &wspubsub.WorkspaceEvent{
+			Kind:          wspubsub.WorkspaceEventKindStateChange,
+			WorkspaceID:   ws3ID,
+			JobStatus:     ptr.Ref(database.ProvisionerJobStatusSucceeded),
+			Transition:    ptr.Ref(database.WorkspaceTransitionDelete),
+			WorkspaceName: ptr.Ref("ws3"),
+		})
+		update = testutil.RequireRecvCtx(ctx, t, ch)
+		require.Equal(t, &proto.WorkspaceUpdate{
 			DeletedWorkspaces: []*proto.Workspace{
 				{
 					Id:     ws3IDSlice,
 					Name:   "ws3",
-					Status: proto.Workspace_STOPPED,
+					Status: proto.Workspace_DELETED,
 				},
 			},
-			DeletedAgents: []*proto.Agent{},
+			DeletedAgents:      []*proto.Agent{},
+			UpsertedWorkspaces: []*proto.Workspace{},
+			UpsertedAgents:     []*proto.Agent{},
+		}, update)
+
+		// Add ws4
+		publishWorkspaceEvent(t, ps, ownerID, &wspubsub.WorkspaceEvent{
+			Kind:          wspubsub.WorkspaceEventKindStateChange,
+			WorkspaceID:   ws4ID,
+			WorkspaceName: ptr.Ref("ws4"),
+			Transition:    ptr.Ref(database.WorkspaceTransitionStart),
+			JobStatus:     ptr.Ref(database.ProvisionerJobStatusRunning),
+		})
+		update = testutil.RequireRecvCtx(ctx, t, ch)
+		require.Equal(t, &proto.WorkspaceUpdate{
+			UpsertedWorkspaces: []*proto.Workspace{
+				{
+					Id:     ws4IDSlice,
+					Name:   "ws4",
+					Status: proto.Workspace_STARTING,
+				},
+			},
+			UpsertedAgents:    []*proto.Agent{},
+			DeletedWorkspaces: []*proto.Workspace{},
+			DeletedAgents:     []*proto.Agent{},
 		}, update)
 	})
 
@@ -200,11 +211,11 @@ func TestWorkspaceUpdates(t *testing.T) {
 		t.Parallel()
 
 		db := &mockWorkspaceStore{
-			orderedRows: []database.GetWorkspacesAndAgentsRow{
+			orderedRows: []database.GetWorkspacesAndAgentsByOwnerIDRow{
 				{
-					ID:         ws1ID,
-					Name:       "ws1",
-					OwnerID:    ownerID,
+					ID:   ws1ID,
+					Name: "ws1",
+
 					JobStatus:  database.ProvisionerJobStatusRunning,
 					Transition: database.WorkspaceTransitionStart,
 					Agents: []database.AgentIDNamePair{
@@ -266,17 +277,18 @@ func TestWorkspaceUpdates(t *testing.T) {
 	})
 }
 
-type mockWorkspaceStore struct {
-	orderedRows []database.GetWorkspacesAndAgentsRow
+func publishWorkspaceEvent(t *testing.T, ps pubsub.Pubsub, ownerID uuid.UUID, event *wspubsub.WorkspaceEvent) {
+	msg, err := json.Marshal(event)
+	require.NoError(t, err)
+	ps.Publish(wspubsub.WorkspaceEventChannel(ownerID), msg)
 }
 
-// GetWorkspaceRBACByAgentID implements tailnet.UpdateQuerier.
-func (*mockWorkspaceStore) GetWorkspaceRBACByAgentID(context.Context, uuid.UUID) (rbac.Objecter, error) {
-	panic("unimplemented")
+type mockWorkspaceStore struct {
+	orderedRows []database.GetWorkspacesAndAgentsByOwnerIDRow
 }
 
 // GetWorkspacesAndAgents implements tailnet.UpdateQuerier.
-func (m *mockWorkspaceStore) GetWorkspacesAndAgents(context.Context) ([]database.GetWorkspacesAndAgentsRow, error) {
+func (m *mockWorkspaceStore) GetWorkspacesAndAgentsByOwnerID(context.Context, uuid.UUID) ([]database.GetWorkspacesAndAgentsByOwnerIDRow, error) {
 	return m.orderedRows, nil
 }
 

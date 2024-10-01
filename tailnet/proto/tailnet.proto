@@ -198,9 +198,7 @@ message TelemetryRequest {
 
 message TelemetryResponse {}
 
-message WorkspaceUpdatesRequest {
-	string token = 1;
-}
+message WorkspaceUpdatesRequest {}
 
 message WorkspaceUpdate {
 	repeated Workspace upserted_workspaces = 1;

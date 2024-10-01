@@ -2090,11 +2090,6 @@ func (api *API) publishWorkspaceUpdate(ctx context.Context, ownerID uuid.UUID, e
 		api.Logger.Warn(ctx, "failed to publish workspace update",
 			slog.F("workspace_id", event.WorkspaceID), slog.Error(err))
 	}
-	err = api.Pubsub.Publish(codersdk.AllWorkspacesNotifyChannel, []byte(workspaceID.String()))
-	if err != nil {
-		api.Logger.Warn(ctx, "failed to publish all workspaces update",
-			slog.F("workspace_id", workspaceID), slog.Error(err))
-	}
 }
 
 func (api *API) publishWorkspaceAgentLogsUpdate(ctx context.Context, workspaceAgentID uuid.UUID, m agentsdk.LogsNotifyMessage) {

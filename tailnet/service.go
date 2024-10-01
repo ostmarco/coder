@@ -43,7 +43,7 @@ type WorkspaceUpdatesProvider interface {
 	Subscribe(peerID uuid.UUID, userID uuid.UUID) (<-chan *proto.WorkspaceUpdate, error)
 	Unsubscribe(peerID uuid.UUID)
 	Stop()
-	IsOwner(userID uuid.UUID, agentID uuid.UUID) error
+	IsOwner(userID uuid.UUID, agentID uuid.UUID) bool
 }
 
 type ClientServiceOptions struct {
@@ -134,7 +134,8 @@ func (s *ClientService) ServeUserClient(ctx context.Context, version string, con
 	switch major {
 	case 2:
 		auth := ClientUserCoordinateeAuth{
-			UserID: opts.UserID,
+			UserID:          opts.UserID,
+			UpdatesProvider: opts.UpdatesProvider,
 		}
 		streamID := StreamID{
 			Name: "client",

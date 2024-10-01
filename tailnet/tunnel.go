@@ -102,8 +102,8 @@ func (a ClientUserCoordinateeAuth) Authorize(req *proto.CoordinateRequest) error
 		if err != nil {
 			return xerrors.Errorf("parse add tunnel id: %w", err)
 		}
-		err = a.UpdatesProvider.IsOwner(a.UserID, uid)
-		if err != nil {
+		isOwner := a.UpdatesProvider.IsOwner(a.UserID, uid)
+		if !isOwner {
 			return xerrors.Errorf("workspace agent not found or you do not have permission: %w", sql.ErrNoRows)
 		}
 	}
