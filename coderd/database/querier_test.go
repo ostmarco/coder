@@ -24,9 +24,7 @@ import (
 	"github.com/coder/coder/v2/coderd/database/dbtestutil"
 	"github.com/coder/coder/v2/coderd/database/dbtime"
 	"github.com/coder/coder/v2/coderd/database/migrations"
-	"github.com/coder/coder/v2/coderd/httpmw"
 	"github.com/coder/coder/v2/coderd/rbac"
-	"github.com/coder/coder/v2/coderd/rbac/policy"
 	"github.com/coder/coder/v2/testutil"
 )
 
@@ -614,7 +612,7 @@ func TestGetWorkspaceAgentUsageStatsAndLabels(t *testing.T) {
 	})
 }
 
-func TestGetAuthorizedWorkspacesAndAgents(t *testing.T) {
+func TestGetWorkspacesAndAgentsByOwnerID(t *testing.T) {
 	t.Parallel()
 	if testing.Short() {
 		t.SkipNow()
@@ -630,7 +628,6 @@ func TestGetAuthorizedWorkspacesAndAgents(t *testing.T) {
 	owner := dbgen.User(t, db, database.User{
 		RBACRoles: []string{rbac.RoleOwner().String()},
 	})
-	user := dbgen.User(t, db, database.User{})
 	tpl := dbgen.Template(t, db, database.Template{
 		OrganizationID: org.ID,
 		CreatedBy:      owner.ID,
@@ -669,23 +666,7 @@ func TestGetAuthorizedWorkspacesAndAgents(t *testing.T) {
 		CreateAgent:         false,
 	})
 
-	authorizer := rbac.NewStrictCachingAuthorizer(prometheus.NewRegistry())
-
-	userSubject, _, err := httpmw.UserRBACSubject(ctx, db, user.ID, rbac.ExpandableScope(rbac.ScopeAll))
-	require.NoError(t, err)
-	preparedUser, err := authorizer.Prepare(ctx, userSubject, policy.ActionRead, rbac.ResourceWorkspace.Type)
-	require.NoError(t, err)
-	userCtx := dbauthz.As(ctx, userSubject)
-	userRows, err := db.GetAuthorizedWorkspacesAndAgents(userCtx, preparedUser)
-	require.NoError(t, err)
-	require.Len(t, userRows, 0)
-
-	ownerSubject, _, err := httpmw.UserRBACSubject(ctx, db, owner.ID, rbac.ExpandableScope(rbac.ScopeAll))
-	require.NoError(t, err)
-	preparedOwner, err := authorizer.Prepare(ctx, ownerSubject, policy.ActionRead, rbac.ResourceWorkspace.Type)
-	require.NoError(t, err)
-	ownerCtx := dbauthz.As(ctx, ownerSubject)
-	ownerRows, err := db.GetAuthorizedWorkspacesAndAgents(ownerCtx, preparedOwner)
+	ownerRows, err := db.GetWorkspacesAndAgentsByOwnerID(ctx, owner.ID)
 	require.NoError(t, err)
 	require.Len(t, ownerRows, 4)
 	for _, row := range ownerRows {

@@ -15144,7 +15144,7 @@ func (q *sqlQuerier) GetWorkspaces(ctx context.Context, arg GetWorkspacesParams)
 	return items, nil
 }
 
-const getWorkspacesAndAgents = `-- name: GetWorkspacesAndAgents :many
+const getWorkspacesAndAgentsByOwnerID = `-- name: GetWorkspacesAndAgentsByOwnerID :many
 SELECT
 	workspaces.id as id,
 	workspaces.name as name,
@@ -15173,12 +15173,13 @@ LEFT JOIN (
 	FROM workspace_resources
 	JOIN workspace_agents ON workspace_agents.resource_id = workspace_resources.id
 ) resources ON resources.job_id = latest_build.job_id
-	-- Authorize Filter clause will be injected below in GetAuthorizedWorkspacesAndAgents
-	-- @authorize_filter
+WHERE
+	-- Filter by owner_id
+	workspaces.owner_id = $1 :: uuid
 GROUP BY workspaces.id, workspaces.name, latest_build.job_status, latest_build.job_id, latest_build.transition
 `
 
-type GetWorkspacesAndAgentsRow struct {
+type GetWorkspacesAndAgentsByOwnerIDRow struct {
 	ID         uuid.UUID            `db:"id" json:"id"`
 	Name       string               `db:"name" json:"name"`
 	OwnerID    uuid.UUID            `db:"owner_id" json:"owner_id"`
@@ -15187,15 +15188,15 @@ type GetWorkspacesAndAgentsRow struct {
 	Agents     []AgentIDNamePair    `db:"agents" json:"agents"`
 }
 
-func (q *sqlQuerier) GetWorkspacesAndAgents(ctx context.Context) ([]GetWorkspacesAndAgentsRow, error) {
-	rows, err := q.db.QueryContext(ctx, getWorkspacesAndAgents)
+func (q *sqlQuerier) GetWorkspacesAndAgentsByOwnerID(ctx context.Context, ownerID uuid.UUID) ([]GetWorkspacesAndAgentsByOwnerIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getWorkspacesAndAgentsByOwnerID, ownerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetWorkspacesAndAgentsRow
+	var items []GetWorkspacesAndAgentsByOwnerIDRow
 	for rows.Next() {
-		var i GetWorkspacesAndAgentsRow
+		var i GetWorkspacesAndAgentsByOwnerIDRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,

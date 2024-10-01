@@ -1649,10 +1649,10 @@ func (m metricsStore) GetWorkspaces(ctx context.Context, arg database.GetWorkspa
 	return workspaces, err
 }
 
-func (m metricsStore) GetWorkspacesAndAgents(ctx context.Context) ([]database.GetWorkspacesAndAgentsRow, error) {
+func (m metricsStore) GetWorkspacesAndAgentsByOwnerID(ctx context.Context, ownerID uuid.UUID) ([]database.GetWorkspacesAndAgentsByOwnerIDRow, error) {
 	start := time.Now()
-	r0, r1 := m.s.GetWorkspacesAndAgents(ctx)
-	m.queryLatencies.WithLabelValues("GetWorkspacesAndAgents").Observe(time.Since(start).Seconds())
+	r0, r1 := m.s.GetWorkspacesAndAgentsByOwnerID(ctx, ownerID)
+	m.queryLatencies.WithLabelValues("GetWorkspacesAndAgentsByOwnerID").Observe(time.Since(start).Seconds())
 	return r0, r1
 }
 
@@ -2697,13 +2697,6 @@ func (m metricsStore) GetAuthorizedWorkspaces(ctx context.Context, arg database.
 	workspaces, err := m.s.GetAuthorizedWorkspaces(ctx, arg, prepared)
 	m.queryLatencies.WithLabelValues("GetAuthorizedWorkspaces").Observe(time.Since(start).Seconds())
 	return workspaces, err
-}
-
-func (m metricsStore) GetAuthorizedWorkspacesAndAgents(ctx context.Context, prepared rbac.PreparedAuthorized) ([]database.GetWorkspacesAndAgentsRow, error) {
-	start := time.Now()
-	r0, r1 := m.s.GetAuthorizedWorkspacesAndAgents(ctx, prepared)
-	m.queryLatencies.WithLabelValues("GetAuthorizedWorkspacesAndAgents").Observe(time.Since(start).Seconds())
-	return r0, r1
 }
 
 func (m metricsStore) GetAuthorizedUsers(ctx context.Context, arg database.GetUsersParams, prepared rbac.PreparedAuthorized) ([]database.GetUsersRow, error) {
