@@ -6776,7 +6776,6 @@ func (q *FakeQuerier) GetWorkspacesAndAgentsByOwnerID(ctx context.Context, owner
 		out = append(out, database.GetWorkspacesAndAgentsByOwnerIDRow{
 			ID:         w.ID,
 			Name:       w.Name,
-			OwnerID:    w.OwnerID,
 			JobStatus:  job.JobStatus,
 			Transition: build.Transition,
 			Agents:     outAgents,

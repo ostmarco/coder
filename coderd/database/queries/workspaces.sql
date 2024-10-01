@@ -692,7 +692,6 @@ UPDATE workspaces SET favorite = false WHERE id = @id;
 SELECT
 	workspaces.id as id,
 	workspaces.name as name,
-	workspaces.owner_id as owner_id,
 	job_status,
 	transition,
 	(array_agg(ROW(agent_id, agent_name)::agent_id_name_pair) FILTER (WHERE agent_id IS NOT NULL))::agent_id_name_pair[] as agents

@@ -10,7 +10,7 @@ DECLARE
 BEGIN
 	-- Write to the notification channel `new_workspace:owner_id`
 	-- with the workspace id as the payload.
-	PERFORM pg_notify('new_workspace:' || NEW.owner_id, NEW.id);
+	PERFORM pg_notify('new_workspace:' || NEW.owner_id, NEW.id::text);
 	RETURN NEW;
 END;
 $$;

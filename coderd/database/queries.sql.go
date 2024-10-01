@@ -15148,7 +15148,6 @@ const getWorkspacesAndAgentsByOwnerID = `-- name: GetWorkspacesAndAgentsByOwnerI
 SELECT
 	workspaces.id as id,
 	workspaces.name as name,
-	workspaces.owner_id as owner_id,
 	job_status,
 	transition,
 	(array_agg(ROW(agent_id, agent_name)::agent_id_name_pair) FILTER (WHERE agent_id IS NOT NULL))::agent_id_name_pair[] as agents
@@ -15182,7 +15181,6 @@ GROUP BY workspaces.id, workspaces.name, latest_build.job_status, latest_build.j
 type GetWorkspacesAndAgentsByOwnerIDRow struct {
 	ID         uuid.UUID            `db:"id" json:"id"`
 	Name       string               `db:"name" json:"name"`
-	OwnerID    uuid.UUID            `db:"owner_id" json:"owner_id"`
 	JobStatus  ProvisionerJobStatus `db:"job_status" json:"job_status"`
 	Transition WorkspaceTransition  `db:"transition" json:"transition"`
 	Agents     []AgentIDNamePair    `db:"agents" json:"agents"`
@@ -15200,7 +15198,6 @@ func (q *sqlQuerier) GetWorkspacesAndAgentsByOwnerID(ctx context.Context, ownerI
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
-			&i.OwnerID,
 			&i.JobStatus,
 			&i.Transition,
 			pq.Array(&i.Agents),
