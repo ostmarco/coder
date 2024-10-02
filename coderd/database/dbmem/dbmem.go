@@ -7776,7 +7776,7 @@ func (q *FakeQuerier) InsertWorkspace(_ context.Context, arg database.InsertWork
 	return workspace, nil
 }
 
-func (q *FakeQuerier) InsertWorkspaceAgent(_ context.Context, arg database.InsertWorkspaceAgentParams) (database.WorkspaceAgent, error) {
+func (q *FakeQuerier) InsertWorkspaceAgent(ctx context.Context, arg database.InsertWorkspaceAgentParams) (database.WorkspaceAgent, error) {
 	if err := validateDatabaseType(arg); err != nil {
 		return database.WorkspaceAgent{}, err
 	}
