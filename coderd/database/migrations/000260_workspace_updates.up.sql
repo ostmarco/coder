@@ -8,15 +8,18 @@ CREATE FUNCTION new_workspace_notify() RETURNS trigger
 AS $$
 DECLARE
 BEGIN
-	-- Write to the notification channel `new_workspace:owner_id`
-	-- with the workspace id as the payload.
-	PERFORM pg_notify('new_workspace:' || NEW.owner_id, NEW.id::text);
+	-- Notify for new workspaces & ownership transfers
+	IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND NEW.owner_id <> OLD.owner_id) THEN
+		-- Write to the notification channel `new_workspace:owner_id`
+		-- with the workspace id as the payload.
+		PERFORM pg_notify('new_workspace:' || NEW.owner_id, NEW.id::text);
+	END IF;
 	RETURN NEW;
 END;
 $$;
 
 CREATE TRIGGER new_workspace_notify
-	AFTER INSERT ON workspaces
+	AFTER INSERT OR UPDATE ON workspaces
 	FOR EACH ROW
 EXECUTE FUNCTION new_workspace_notify();
 
@@ -68,4 +71,3 @@ CREATE TRIGGER new_agent_notify
 	AFTER INSERT ON workspace_agents
 	FOR EACH ROW
 EXECUTE FUNCTION new_agent_notify();
-
