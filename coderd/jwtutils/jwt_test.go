@@ -235,13 +235,13 @@ func TestJWS(t *testing.T) {
 			ctx   = testutil.Context(t, testutil.WaitShort)
 			db, _ = dbtestutil.NewDB(t)
 			_     = dbgen.CryptoKey(t, db, database.CryptoKey{
-				Feature:  database.CryptoKeyFeatureOidcConvert,
+				Feature:  database.CryptoKeyFeatureOIDCConvert,
 				StartsAt: time.Now(),
 			})
 			log = slogtest.Make(t, nil)
 		)
 
-		cache, err := cryptokeys.NewSigningCache(log, db, database.CryptoKeyFeatureOidcConvert)
+		cache, err := cryptokeys.NewSigningCache(log, db, database.CryptoKeyFeatureOIDCConvert)
 		require.NoError(t, err)
 
 		claims := testClaims{
@@ -324,13 +324,13 @@ func TestJWE(t *testing.T) {
 			ctx   = testutil.Context(t, testutil.WaitShort)
 			db, _ = dbtestutil.NewDB(t)
 			_     = dbgen.CryptoKey(t, db, database.CryptoKey{
-				Feature:  database.CryptoKeyFeatureWorkspaceApps,
+				Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 				StartsAt: time.Now(),
 			})
 			log = slogtest.Make(t, nil)
 		)
 
-		cache, err := cryptokeys.NewEncryptionCache(log, db, database.CryptoKeyFeatureWorkspaceApps)
+		cache, err := cryptokeys.NewEncryptionCache(log, db, database.CryptoKeyFeatureWorkspaceAppsAPIKey)
 		require.NoError(t, err)
 
 		claims := testClaims{

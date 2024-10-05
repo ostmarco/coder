@@ -264,12 +264,12 @@ func (d *dbCache) Close() error {
 }
 
 func isEncryptionKeyFeature(feature database.CryptoKeyFeature) bool {
-	return feature == database.CryptoKeyFeatureWorkspaceApps
+	return feature == database.CryptoKeyFeatureWorkspaceAppsAPIKey
 }
 
 func isSigningKeyFeature(feature database.CryptoKeyFeature) bool {
 	switch feature {
-	case database.CryptoKeyFeatureTailnetResume, database.CryptoKeyFeatureOidcConvert:
+	case database.CryptoKeyFeatureTailnetResume, database.CryptoKeyFeatureOIDCConvert:
 		return true
 	default:
 		return false

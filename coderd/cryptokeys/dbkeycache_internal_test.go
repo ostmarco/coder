@@ -32,7 +32,7 @@ func Test_version(t *testing.T) {
 		)
 
 		expectedKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 32,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -44,7 +44,7 @@ func Test_version(t *testing.T) {
 			32: expectedKey,
 		}
 
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 		k.keys = cache
 
@@ -65,7 +65,7 @@ func Test_version(t *testing.T) {
 		)
 
 		expectedKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 33,
 			StartsAt: clock.Now(),
 			Secret: sql.NullString{
@@ -74,9 +74,9 @@ func Test_version(t *testing.T) {
 			},
 		}
 
-		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceApps).Return([]database.CryptoKey{expectedKey}, nil)
+		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceAppsAPIKey).Return([]database.CryptoKey{expectedKey}, nil)
 
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 
 		got, err := k.sequence(ctx, keyID(expectedKey))
@@ -97,7 +97,7 @@ func Test_version(t *testing.T) {
 
 		cache := map[int32]database.CryptoKey{
 			32: {
-				Feature:  database.CryptoKeyFeatureWorkspaceApps,
+				Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 				Sequence: 32,
 				Secret: sql.NullString{
 					String: mustGenerateKey(t),
@@ -110,7 +110,7 @@ func Test_version(t *testing.T) {
 			},
 		}
 
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 		k.keys = cache
 
@@ -130,7 +130,7 @@ func Test_version(t *testing.T) {
 		)
 
 		invalidKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 32,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -141,9 +141,9 @@ func Test_version(t *testing.T) {
 				Valid: true,
 			},
 		}
-		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceApps).Return([]database.CryptoKey{invalidKey}, nil)
+		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceAppsAPIKey).Return([]database.CryptoKey{invalidKey}, nil)
 
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 
 		_, err := k.sequence(ctx, keyID(invalidKey))
@@ -166,7 +166,7 @@ func Test_latest(t *testing.T) {
 		)
 
 		latestKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 32,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -174,7 +174,7 @@ func Test_latest(t *testing.T) {
 			},
 			StartsAt: clock.Now(),
 		}
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 
 		k.latestKey = latestKey
@@ -197,7 +197,7 @@ func Test_latest(t *testing.T) {
 		)
 
 		latestKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 33,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -207,7 +207,7 @@ func Test_latest(t *testing.T) {
 		}
 
 		invalidKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 32,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -220,9 +220,9 @@ func Test_latest(t *testing.T) {
 			},
 		}
 
-		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceApps).Return([]database.CryptoKey{latestKey}, nil)
+		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceAppsAPIKey).Return([]database.CryptoKey{latestKey}, nil)
 
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 		k.latestKey = invalidKey
 
@@ -244,7 +244,7 @@ func Test_latest(t *testing.T) {
 		)
 
 		inactiveKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 32,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -254,7 +254,7 @@ func Test_latest(t *testing.T) {
 		}
 
 		activeKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 33,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -263,9 +263,9 @@ func Test_latest(t *testing.T) {
 			StartsAt: clock.Now(),
 		}
 
-		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceApps).Return([]database.CryptoKey{inactiveKey, activeKey}, nil)
+		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceAppsAPIKey).Return([]database.CryptoKey{inactiveKey, activeKey}, nil)
 
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 
 		id, secret, err := k.latest(ctx)
@@ -286,7 +286,7 @@ func Test_latest(t *testing.T) {
 		)
 
 		inactiveKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 32,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -296,7 +296,7 @@ func Test_latest(t *testing.T) {
 		}
 
 		invalidKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 33,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -309,9 +309,9 @@ func Test_latest(t *testing.T) {
 			},
 		}
 
-		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceApps).Return([]database.CryptoKey{inactiveKey, invalidKey}, nil)
+		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceAppsAPIKey).Return([]database.CryptoKey{inactiveKey, invalidKey}, nil)
 
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 
 		_, _, err := k.latest(ctx)
@@ -333,11 +333,11 @@ func Test_clear(t *testing.T) {
 			logger = slogtest.Make(t, nil)
 		)
 
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 
 		activeKey := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 33,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -346,7 +346,7 @@ func Test_clear(t *testing.T) {
 			StartsAt: clock.Now(),
 		}
 
-		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceApps).Return([]database.CryptoKey{activeKey}, nil)
+		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceAppsAPIKey).Return([]database.CryptoKey{activeKey}, nil)
 
 		_, _, err := k.latest(ctx)
 		require.NoError(t, err)
@@ -369,11 +369,11 @@ func Test_clear(t *testing.T) {
 			logger = slogtest.Make(t, nil)
 		)
 
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 
 		key := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 32,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -382,7 +382,7 @@ func Test_clear(t *testing.T) {
 			StartsAt: clock.Now(),
 		}
 
-		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceApps).Return([]database.CryptoKey{key}, nil)
+		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceAppsAPIKey).Return([]database.CryptoKey{key}, nil)
 
 		// Advance it five minutes so that we can test that the
 		// timer is reset and doesn't fire after another five minute.
@@ -418,11 +418,11 @@ func Test_clear(t *testing.T) {
 
 		trap := clock.Trap().Now("clear")
 
-		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceApps, WithDBCacheClock(clock))
+		k := newDBCache(logger, mockDB, database.CryptoKeyFeatureWorkspaceAppsAPIKey, WithDBCacheClock(clock))
 		defer k.Close()
 
 		key := database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureWorkspaceApps,
+			Feature:  database.CryptoKeyFeatureWorkspaceAppsAPIKey,
 			Sequence: 32,
 			Secret: sql.NullString{
 				String: mustGenerateKey(t),
@@ -431,7 +431,7 @@ func Test_clear(t *testing.T) {
 			StartsAt: clock.Now(),
 		}
 
-		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceApps).Return([]database.CryptoKey{key}, nil).Times(2)
+		mockDB.EXPECT().GetCryptoKeysByFeature(ctx, database.CryptoKeyFeatureWorkspaceAppsAPIKey).Return([]database.CryptoKey{key}, nil).Times(2)
 
 		// Move us past the initial timer.
 		id, secret, err := k.latest(ctx)

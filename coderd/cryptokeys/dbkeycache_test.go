@@ -38,12 +38,12 @@ func TestDBKeyCache(t *testing.T) {
 			)
 
 			key := dbgen.CryptoKey(t, db, database.CryptoKey{
-				Feature:  database.CryptoKeyFeatureOidcConvert,
+				Feature:  database.CryptoKeyFeatureOIDCConvert,
 				Sequence: 1,
 				StartsAt: clock.Now().UTC(),
 			})
 
-			k, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureOidcConvert, cryptokeys.WithDBCacheClock(clock))
+			k, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureOIDCConvert, cryptokeys.WithDBCacheClock(clock))
 			require.NoError(t, err)
 			defer k.Close()
 
@@ -62,7 +62,7 @@ func TestDBKeyCache(t *testing.T) {
 				logger = slogtest.Make(t, nil)
 			)
 
-			k, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureOidcConvert, cryptokeys.WithDBCacheClock(clock))
+			k, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureOIDCConvert, cryptokeys.WithDBCacheClock(clock))
 			require.NoError(t, err)
 			defer k.Close()
 
@@ -82,24 +82,24 @@ func TestDBKeyCache(t *testing.T) {
 		)
 
 		_ = dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureOidcConvert,
+			Feature:  database.CryptoKeyFeatureOIDCConvert,
 			Sequence: 10,
 			StartsAt: clock.Now().UTC(),
 		})
 
 		expectedKey := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureOidcConvert,
+			Feature:  database.CryptoKeyFeatureOIDCConvert,
 			Sequence: 12,
 			StartsAt: clock.Now().UTC(),
 		})
 
 		_ = dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureOidcConvert,
+			Feature:  database.CryptoKeyFeatureOIDCConvert,
 			Sequence: 2,
 			StartsAt: clock.Now().UTC(),
 		})
 
-		k, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureOidcConvert, cryptokeys.WithDBCacheClock(clock))
+		k, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureOIDCConvert, cryptokeys.WithDBCacheClock(clock))
 		require.NoError(t, err)
 		defer k.Close()
 
@@ -120,12 +120,12 @@ func TestDBKeyCache(t *testing.T) {
 		)
 
 		expectedKey := dbgen.CryptoKey(t, db, database.CryptoKey{
-			Feature:  database.CryptoKeyFeatureOidcConvert,
+			Feature:  database.CryptoKeyFeatureOIDCConvert,
 			Sequence: 10,
 			StartsAt: clock.Now(),
 		})
 
-		k, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureOidcConvert, cryptokeys.WithDBCacheClock(clock))
+		k, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureOIDCConvert, cryptokeys.WithDBCacheClock(clock))
 		require.NoError(t, err)
 		defer k.Close()
 
@@ -157,11 +157,11 @@ func TestDBKeyCache(t *testing.T) {
 			ctx    = testutil.Context(t, testutil.WaitShort)
 		)
 
-		_, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureWorkspaceApps, cryptokeys.WithDBCacheClock(clock))
+		_, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureWorkspaceAppsAPIKey, cryptokeys.WithDBCacheClock(clock))
 		require.ErrorIs(t, err, cryptokeys.ErrInvalidFeature)
 
 		// Instantiate a signing cache and try to use it as an encryption cache.
-		sc, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureOidcConvert, cryptokeys.WithDBCacheClock(clock))
+		sc, err := cryptokeys.NewSigningCache(logger, db, database.CryptoKeyFeatureOIDCConvert, cryptokeys.WithDBCacheClock(clock))
 		require.NoError(t, err)
 		defer sc.Close()
 
@@ -184,11 +184,11 @@ func TestDBKeyCache(t *testing.T) {
 			ctx    = testutil.Context(t, testutil.WaitShort)
 		)
 
-		_, err := cryptokeys.NewEncryptionCache(logger, db, database.CryptoKeyFeatureOidcConvert, cryptokeys.WithDBCacheClock(clock))
+		_, err := cryptokeys.NewEncryptionCache(logger, db, database.CryptoKeyFeatureOIDCConvert, cryptokeys.WithDBCacheClock(clock))
 		require.ErrorIs(t, err, cryptokeys.ErrInvalidFeature)
 
 		// Instantiate an encryption cache and try to use it as a signing cache.
-		ec, err := cryptokeys.NewEncryptionCache(logger, db, database.CryptoKeyFeatureWorkspaceApps, cryptokeys.WithDBCacheClock(clock))
+		ec, err := cryptokeys.NewEncryptionCache(logger, db, database.CryptoKeyFeatureWorkspaceAppsAPIKey, cryptokeys.WithDBCacheClock(clock))
 		require.NoError(t, err)
 		defer ec.Close()
 
